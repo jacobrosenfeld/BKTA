@@ -8,7 +8,8 @@ function saveTwoPagePDFs() {
     
     // 1) Get parent folder of this spreadsheet
     const thisFile     = DriveApp.getFileById(ss.getId());
-    const parentFolder = thisFile.getParents().next();
+    const parentFolder = DriveApp.getFileById(ss.getId()).getParents();
+    const folderId = "19chei_ERIjgjFqGfnteUquSGtuRLLZMB";
     
     // 2) Compute upcoming Friday date
     const fridayDate   = getUpcomingFriday();
@@ -17,11 +18,11 @@ function saveTwoPagePDFs() {
     
     // 3) Create (or reuse) the Shabbos folder
     let shabbosFolder;
-    const foldersIter = parentFolder.getFoldersByName(folderName);
+    const foldersIter = folderId.getFoldersByName(folderName);
     if (foldersIter.hasNext()) {
       shabbosFolder = foldersIter.next();
     } else {
-      shabbosFolder = parentFolder.createFolder(folderName);
+      shabbosFolder = folderId.createFolder(folderName);
     }
     
     // RANGES for formatting swaps
