@@ -1,72 +1,89 @@
 function saveTwoPagePDFs() {
-    const ss           = SpreadsheetApp.getActive();
-    const orig         = ss.getSheetByName('BKTA');
-    if (!orig) throw new Error('Sheet BKTA not found');
-    const baseName     = 'BKTA Newsletter';
-    const parentFolder = DriveApp.getFolderById('19chei_ERIjgjFqGfnteUquSGtuRLLZMB');
-    const friday       = getUpcomingFriday();
-    const tz           = ss.getSpreadsheetTimeZone();
-    const subName      = 'Shabbos - ' + Utilities.formatDate(friday, tz, 'yyyy-MM-dd');
-    let shabbosFolder  = parentFolder.getFoldersByName(subName).hasNext()
-                          ? parentFolder.getFoldersByName(subName).next()
-                          : parentFolder.createFolder(subName);
-  
-    // 1) Create temp sheets
-    const tmp1 = ss.insertSheet('_tmp_page1');
-    orig.getRange('B1:G30').copyTo(tmp1.getRange('A1'));
-    const tmp2 = ss.insertSheet('_tmp_page2');
-    orig.getRange('B32:G62').copyTo(tmp2.getRange('A1'));
-  
-    // 2) Cache original visibility and hide everything except temps
-    const states = ss.getSheets().map(sh => ({name: sh.getName(), hidden: sh.isSheetHidden()}));
-    ss.getSheets().forEach(sh => {
-      if (sh.getName() !== tmp1.getName() && sh.getName() !== tmp2.getName()) {
-        sh.hideSheet();
-      } else {
-        sh.showSheet();
-      }
-    });
-  
-    // Range which needs recoloring in each temp (first 4 rows)
-    const colorRanges = [
-      tmp1.getRange('A1:G4'),
-      tmp2.getRange('A1:G4')
-    ];
-  
-    // ––– Color PDF
-    colorRanges.forEach(r => r.setBackground('#030e4f').setFontColor('#d78e22'));
-    let blob = exportAllSheetsAsPDF(ss, baseName + '_Color');
-    shabbosFolder.createFile(blob);
-  
-    // ––– B/W PDF
-    colorRanges.forEach(r => r.setBackground('#F2F2F2').setFontColor('#FFFFFF'));
-    blob = exportAllSheetsAsPDF(ss, baseName + '_BW');
-    shabbosFolder.createFile(blob);
-  
-    // 5) Cleanup: restore sheet visibility, remove temps
-    states.forEach(st => {
-      const sh = ss.getSheetByName(st.name);
-      st.hidden ? sh.hideSheet() : sh.showSheet();
-    });
-    ss.deleteSheet(tmp1);
-    ss.deleteSheet(tmp2);
+    // —–– CONFIGURE THESE —––
+    const sheetName    = 'BKTA';
+    const fileBaseName = 'BKTA Newsletter';
+    const ss           = SpreadsheetApp.getActiveSpreadsheet();
+    const sh           = ss.getSheetByName(sheetName);
+    if (!sh) throw new Error(`Sheet "${sheetName}" not found`);
+    
+    // 1) Use your specific “parent” folder ID
+    const parentFolderId = '19chei_ERIjgjFqGfnteUquSGtuRLLZMB';
+    const parentFolder   = DriveApp.getFolderById(parentFolderId);
+    
+    // 2) Compute upcoming Friday’s date
+    const fridayDate = getUpcomingFriday();
+    const tz         = ss.getSpreadsheetTimeZone();
+    const folderName = `Shabbos - ${Utilities.formatDate(fridayDate, tz, 'yyyy-MM-dd')}`;
+    
+    // 3) Create or reuse the “Shabbos - YYYY-MM-DD” subfolder
+    let shabbosFolder;
+    const it = parentFolder.getFoldersByName(folderName);
+    if (it.hasNext()) {
+      shabbosFolder = it.next();
+    } else {
+      shabbosFolder = parentFolder.createFolder(folderName);
+    }
+    
+    // 4) Ranges for formatting swap
+    const page1Fmt = sh.getRange('B1:G4');
+    const page2Fmt = sh.getRange('B32:G35');
+    const bg1 = page1Fmt.getBackgrounds(), fg1 = page1Fmt.getFontColors();
+    const bg2 = page2Fmt.getBackgrounds(), fg2 = page2Fmt.getFontColors();
+    
+    // 5) Force two pages
+    const pb = sh.insertPageBreak(31);
+    
+    // —–– Color PDF
+    page1Fmt.setBackground('#030e4f').setFontColor('#d78e22');
+    page2Fmt.setBackground('#030e4f').setFontColor('#d78e22');
+    const pdfColor = _exportSheetAsPDF(ss, sh.getSheetId(), `${fileBaseName}_Color`);
+    shabbosFolder.createFile(pdfColor);
+    
+    // —–– B/W PDF
+    page1Fmt.setBackground('#F2F2F2').setFontColor('#FFFFFF');
+    page2Fmt.setBackground('#F2F2F2').setFontColor('#FFFFFF');
+    const pdfBW = _exportSheetAsPDF(ss, sh.getSheetId(), `${fileBaseName}_BW`);
+    shabbosFolder.createFile(pdfBW);
+    
+    // 6) Restore original formatting & cleanup
+    page1Fmt.setBackgrounds(bg1).setFontColors(fg1);
+    page2Fmt.setBackgrounds(bg2).setFontColors(fg2);
+    sh.removePageBreak(pb);
   }
   
-  function exportAllSheetsAsPDF(ss, name) {
-    const url = ss.getUrl().replace(/\/edit.*$/, '') +
-      'export?exportFormat=pdf&format=pdf' +
-      '&size=letter&portrait=true&fitw=true' +
-      '&top_margin=0.50&bottom_margin=0.50&left_margin=0.50&right_margin=0.50' +
-      '&sheetnames=false&printtitle=false&pagenumbers=true&gridlines=false&fzr=false';
+  
+  function _exportSheetAsPDF(ss, sheetId, name) {
+    const baseUrl = ss.getUrl().replace(/\/edit.*$/, '');
+    const opts = [
+      `export?exportFormat=pdf&format=pdf`,
+      `&gid=${sheetId}`,
+      `&size=letter`,
+      `&portrait=true`,
+      `&fitw=true`,
+      `&top_margin=0.50`,
+      `&bottom_margin=0.50`,
+      `&left_margin=0.50`,
+      `&right_margin=0.50`,
+      `&sheetnames=false`,
+      `&printtitle=false`,
+      `&pagenumbers=true`,
+      `&gridlines=false`,
+      `&fzr=false`
+    ].join('');
+    
+    const url   = baseUrl + opts;
     const token = ScriptApp.getOAuthToken();
-    const res   = UrlFetchApp.fetch(url, {headers:{Authorization:'Bearer '+token}});
-    return res.getBlob().setName(name+'.pdf');
+    const resp  = UrlFetchApp.fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    return resp.getBlob().setName(`${name}.pdf`);
   }
+  
   
   function getUpcomingFriday() {
-    const d = new Date(), day = d.getDay();
-    let diff = (5 - day + 7) % 7; if (!diff) diff = 7;
-    d.setDate(d.getDate() + diff);
-    return d;
+    const today = new Date();
+    const dow   = today.getDay();            // Sunday=0 … Friday=5
+    let diff    = (5 - dow + 7) % 7;         // days till Friday
+    if (diff === 0) diff = 7;                // if today is Friday, go to next Friday
+    today.setDate(today.getDate() + diff);
+    return today;
   }
   
