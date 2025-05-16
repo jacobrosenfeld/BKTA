@@ -30,7 +30,7 @@ function saveTwoPagePDFs() {
     const opts = [
       `export?exportFormat=pdf&format=pdf`,
       `&gid=${sheetId}`,
-      '&range=BKTA!A1:G35',
+      '&range=BKTA!B1:G61',
       `&size=letter`,
       `&portrait=true`,
       `&fitw=true`,
