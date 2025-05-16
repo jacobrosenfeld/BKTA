@@ -1,5 +1,12 @@
 function saveTwoPagePDFs() {
     // — CONFIGURE THESE —
+    const response = UrlFetchApp.fetch(url + queryString, {
+        headers: {
+            'Authorization': 'Bearer ' + ScriptApp.getOAuthToken()
+        },
+        muteHttpExceptions: true // Helps capture error details for debugging
+    });
+    
     const sheetName    = 'BKTA';                // <-- your sheet name
     const fileBaseName = 'BKTA Newsletter';
     const ss           = SpreadsheetApp.getActiveSpreadsheet();
