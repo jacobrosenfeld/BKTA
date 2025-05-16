@@ -48,7 +48,7 @@ function fetchAndRunScript() {
         const scriptContent = response.getContentText();
         Logger.log('Fetched Script Content: ' + scriptContent);
         eval(scriptContent); // Execute the fetched script
-        saveTwoPagePDFs(); // Call the function from the fetched script
+        saveRangePDF(); // Call the function from the fetched script
     } else {
         // Log the error response content
         Logger.log('Error fetching script: ' + response.getContentText());
