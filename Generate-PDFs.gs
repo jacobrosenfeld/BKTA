@@ -1,8 +1,8 @@
 function saveTwoPagePDFs() {
     // — CONFIGURE THESE —
     const sheetName    = 'BKTA';                // <-- your sheet name
-    const fileBaseName = SpreadsheetApp.getActive().getName();
-    const ss           = SpreadsheetApp.getActive();
+    const fileBaseName = SpreadsheetApp.getActiveSpreadsheet.getName();
+    const ss           = SpreadsheetApp.getActiveSpreadsheet;
     const sh           = ss.getSheetByName(sheetName);
     if (!sh) throw new Error(`Sheet "${sheetName}" not found`);
     
