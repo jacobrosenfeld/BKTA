@@ -8,47 +8,63 @@ function saveRangePDF() {
     const sheet = ss.getSheetByName(sheetName);
     if (!sheet) throw new Error(`Sheet "${sheetName}" not found.`);
     
-    // grab parsha & date
+    // Parsha & date
     const parshaName = sheet.getRange('J2').getDisplayValue().trim();
     const friday     = getUpcomingFriday();
     const tz         = ss.getSpreadsheetTimeZone();
     const dateStr    = Utilities.formatDate(friday, tz, 'yyyy-MM-dd');
     
-    // make/find the Shabbos folder
-    const parent     = DriveApp.getFolderById(parentFolderId);
+    // Shabbos subfolder
+    const parent = DriveApp.getFolderById(parentFolderId);
     const folderName = `Shabbos - ${dateStr} - ${parshaName}`;
-    const folder     = parent.getFoldersByName(folderName).hasNext()
-                         ? parent.getFoldersByName(folderName).next()
-                         : parent.createFolder(folderName);
+    const folder = parent.getFoldersByName(folderName).hasNext()
+      ? parent.getFoldersByName(folderName).next()
+      : parent.createFolder(folderName);
     
-    // export only B1:G62 of BKTA
+    // Export the range
     const blob = exportRangeAsPDF(
       ss.getId(),
       sheet.getSheetId(),
       `${sheetName}!B1:G62`
     );
     
-    // --- new: detect if this is a B/W layout by checking B1's fill ---
-    const rawColor = sheet.getRange('B1').getBackground().toLowerCase();
-    const isBW     = rawColor === '#c0c0c0';
+    // Detect B/W mode by B1 background
+    const isBW   = sheet.getRange('B1').getBackground().toLowerCase() === '#c0c0c0';
+    const base   = `${fileBaseName} - ${parshaName} - ${dateStr}`;
     
-    // build versioned filename
-    const baseFile = `${fileBaseName} - ${parshaName} - ${dateStr}`;
-    let version    = 1;
-    let fileName   = `${baseFile}${isBW ? '_BW' : ''}.pdf`;
+    // Determine version from existing color files
+    const maxVer = getMaxVersion(folder, base);
+    let version, fileName;
     
-    // if file exists, bump to _v2, _v3, ...
-    while ( folder.getFilesByName(fileName).hasNext() ) {
-      version++;
-      fileName = `${baseFile}_v${version}${isBW ? '_BW' : ''}.pdf`;
+    if (!isBW) {
+      // Color: next version
+      version  = maxVer + 1;
+      const vs = version === 1 ? '' : `_v${version}`;
+      fileName = `${base}${vs}.pdf`;
+    } else {
+      // B/W: match max version (or 1 if none)
+      version  = maxVer || 1;
+      const vs = version === 1 ? '' : `_v${version}`;
+      fileName = `${base}${vs}_BW.pdf`;
     }
     
+    // Ensure unique (in case someone re-ran)
+    while (folder.getFilesByName(fileName).hasNext()) {
+      version++;
+      const vs = version === 1 ? '' : `_v${version}`;
+      fileName = isBW
+        ? `${base}${vs}_BW.pdf`
+        : `${base}${vs}.pdf`;
+    }
+    
+    // Save it
     blob.setName(fileName);
     folder.createFile(blob);
   }
   
   
-  // helper: builds the export URL & returns a PDF blob
+  // —–– HELPERS —––
+  
   function exportRangeAsPDF(ssId, gid, range) {
     const url =  
       `https://docs.google.com/spreadsheets/d/${ssId}/export?` +
@@ -57,8 +73,8 @@ function saveRangePDF() {
         'format=pdf',
         'size=letter',
         'portrait=true',
-        'fitw=true',                                 // fit-to-width
-        `range=${encodeURIComponent(range)}`,        // e.g. BKTA!B1:G62
+        'fitw=true',
+        `range=${encodeURIComponent(range)}`,
         `gid=${gid}`,
         'top_margin=0.50',
         'bottom_margin=0.50',
@@ -78,8 +94,6 @@ function saveRangePDF() {
     return resp.getBlob();
   }
   
-  
-  // helper: next Friday’s date
   function getUpcomingFriday() {
     const d   = new Date();
     const dow = d.getDay();            // Sunday=0 … Friday=5
@@ -87,5 +101,22 @@ function saveRangePDF() {
     // if (diff === 0) diff = 7;          // if today IS Friday, pick next
     d.setDate(d.getDate() + diff);
     return d;
+  }
+  
+  function getMaxVersion(folder, base) {
+    let max = 0;
+    const files = folder.getFiles();
+    const esc   = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re    = new RegExp(`^${esc}(?:_v(\\d+))?(?:_BW)?\\.pdf$`);
+    
+    while (files.hasNext()) {
+      const name = files.next().getName();
+      const m = name.match(re);
+      if (m) {
+        const v = m[1] ? parseInt(m[1], 10) : 1;
+        if (v > max) max = v;
+      }
+    }
+    return max;
   }
   
