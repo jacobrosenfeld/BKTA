@@ -8,36 +8,39 @@ function saveRangePDF() {
     const sheet = ss.getSheetByName(sheetName);
     if (!sheet) throw new Error(`Sheet "${sheetName}" not found.`);
     
-    // grab parsha from J2
+    // grab parsha & date
     const parshaName = sheet.getRange('J2').getDisplayValue().trim();
+    const friday     = getUpcomingFriday();
+    const tz         = ss.getSpreadsheetTimeZone();
+    const dateStr    = Utilities.formatDate(friday, tz, 'yyyy-MM-dd');
     
-    // compute upcoming Friday & date string
-    const friday  = getUpcomingFriday();
-    const tz      = ss.getSpreadsheetTimeZone();
-    const dateStr = Utilities.formatDate(friday, tz, 'yyyy-MM-dd');
-    
-    // build subfolder (unchanged)
-    const parent  = DriveApp.getFolderById(parentFolderId);
+    // make/find the Shabbos folder
+    const parent     = DriveApp.getFolderById(parentFolderId);
     const folderName = `Shabbos - ${dateStr} - ${parshaName}`;
-    const folder  = parent.getFoldersByName(folderName).hasNext()
-                      ? parent.getFoldersByName(folderName).next()
-                      : parent.createFolder(folderName);
+    const folder     = parent.getFoldersByName(folderName).hasNext()
+                         ? parent.getFoldersByName(folderName).next()
+                         : parent.createFolder(folderName);
     
-    // export the range B1:G62
+    // export only B1:G62 of BKTA
     const blob = exportRangeAsPDF(
       ss.getId(),
       sheet.getSheetId(),
       `${sheetName}!B1:G62`
     );
     
-    // build the versioned filename
+    // --- new: detect if this is a B/W layout by checking B1's fill ---
+    const rawColor = sheet.getRange('B1').getBackground().toLowerCase();
+    const isBW     = rawColor === '#c0c0c0';
+    
+    // build versioned filename
     const baseFile = `${fileBaseName} - ${parshaName} - ${dateStr}`;
     let version    = 1;
-    let fileName   = `${baseFile}.pdf`;
+    let fileName   = `${baseFile}${isBW ? '_BW' : ''}.pdf`;
     
+    // if file exists, bump to _v2, _v3, ...
     while ( folder.getFilesByName(fileName).hasNext() ) {
       version++;
-      fileName = `${baseFile}_v${version}.pdf`;
+      fileName = `${baseFile}_v${version}${isBW ? '_BW' : ''}.pdf`;
     }
     
     blob.setName(fileName);
