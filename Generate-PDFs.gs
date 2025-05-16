@@ -53,7 +53,7 @@ function saveTwoPagePDFs() {
   
   
   function _exportSheetAsPDF(ss, sheetId, name) {
-    const baseUrl = ss.getUrl().replace(/\/edit.*$/, '');
+    const baseUrl = 'https://docs.google.com/spreadsheets/d/' + ss.getId() + '/export?';
     const opts = [
       `export?exportFormat=pdf&format=pdf`,
       `&gid=${sheetId}`,
