@@ -1,99 +1,90 @@
 function saveTwoPagePDFs() {
-    const ss             = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet1Name     = 'BKTA';
-    const sheet2Name     = 'BKTA_DT';
-    const fileBaseName   = 'BKTA Newsletter';
+    // —–– CONFIGURE THESE —––
+    const sheetName    = 'BKTA';
+    const fileBaseName = 'BKTA Newsletter';
+    const ss           = SpreadsheetApp.getActiveSpreadsheet();
+    const sh           = ss.getSheetByName(sheetName);
+    if (!sh) throw new Error(`Sheet "${sheetName}" not found`);
+    
+    // 1) Use your specific “parent” folder ID
     const parentFolderId = '19chei_ERIjgjFqGfnteUquSGtuRLLZMB';
-  
-    // 1) Grab both sheets
-    const sheet1 = ss.getSheetByName(sheet1Name);
-    const sheet2 = ss.getSheetByName(sheet2Name);
-    if (!sheet1 || !sheet2) {
-      throw new Error(`Sheets "${sheet1Name}" and "${sheet2Name}" must both exist.`);
+    const parentFolder   = DriveApp.getFolderById(parentFolderId);
+    
+    // 2) Compute upcoming Friday’s date
+    const fridayDate = getUpcomingFriday();
+    const tz         = ss.getSpreadsheetTimeZone();
+    const folderName = `Shabbos - ${Utilities.formatDate(fridayDate, tz, 'yyyy-MM-dd')}`;
+    
+    // 3) Create or reuse the “Shabbos - YYYY-MM-DD” subfolder
+    let shabbosFolder;
+    const it = parentFolder.getFoldersByName(folderName);
+    if (it.hasNext()) {
+      shabbosFolder = it.next();
+    } else {
+      shabbosFolder = parentFolder.createFolder(folderName);
     }
-  
-    // 2) Compute Shabbos folder
-    const parentFolder = DriveApp.getFolderById(parentFolderId);
-    const fridayDate   = getUpcomingFriday();
-    const tz           = ss.getSpreadsheetTimeZone();
-    const folderName   = `Shabbos - ${Utilities.formatDate(fridayDate, tz, 'yyyy-MM-dd')}`;
-    const shabbosFolder = parentFolder
-      .getFoldersByName(folderName)
-      .hasNext()
-        ? parentFolder.getFoldersByName(folderName).next()
-        : parentFolder.createFolder(folderName);
-  
-    // 3) Hide everything except your two sheets
-    const allSheets = ss.getSheets();
-    const visState  = allSheets.map(s => ({ sheet: s, hidden: s.isSheetHidden() }));
-    allSheets.forEach(s => {
-      if (s.getSheetName() === sheet1Name || s.getSheetName() === sheet2Name) {
-        s.showSheet();
-      } else {
-        s.hideSheet();
-      }
-    });
-  
-    // 4) Ranges to recolor on each sheet
-    const r1 = sheet1.getRange('B1:G4');
-    const r2 = sheet2.getRange('B1:G4');
-    const bg1 = r1.getBackgrounds(), fg1 = r1.getFontColors();
-    const bg2 = r2.getBackgrounds(), fg2 = r2.getFontColors();
-  
-    // —–– Color PDF
-    r1.setBackground('#030e4f').setFontColor('#d78e22');
-    r2.setBackground('#030e4f').setFontColor('#d78e22');
-    let blob = _exportVisibleAsPDF(ss, `${fileBaseName}_Color`);
-    shabbosFolder.createFile(blob);
-  
-    // —–– B/W PDF
-    r1.setBackground('#F2F2F2').setFontColor('#FFFFFF');
-    r2.setBackground('#F2F2F2').setFontColor('#FFFFFF');
-    blob = _exportVisibleAsPDF(ss, `${fileBaseName}_BW`);
-    shabbosFolder.createFile(blob);
-  
-    // 5) Restore formatting and sheet visibility
-    r1.setBackgrounds(bg1).setFontColors(fg1);
-    r2.setBackgrounds(bg2).setFontColors(fg2);
-    visState.forEach(v => {
-      v.hidden ? v.sheet.hideSheet() : v.sheet.showSheet();
-    });
+    
+    // // 4) Ranges for formatting swap
+    // const page1Fmt = sh.getRange('B1:G4');
+    // const page2Fmt = sh.getRange('B32:G35');
+    // const bg1 = page1Fmt.getBackgrounds(), fg1 = page1Fmt.getFontColors();
+    // const bg2 = page2Fmt.getBackgrounds(), fg2 = page2Fmt.getFontColors();
+    
+    // // 5) Force two pages
+    // const pb = sh.insertPageBreak(31);
+    
+    // // —–– Color PDF
+    // page1Fmt.setBackground('#030e4f').setFontColor('#d78e22');
+    // page2Fmt.setBackground('#030e4f').setFontColor('#d78e22');
+    // const pdfColor = _exportSheetAsPDF(ss, sh.getSheetId(), `${fileBaseName}_Color`);
+    // shabbosFolder.createFile(pdfColor);
+    
+    // // —–– B/W PDF
+    // page1Fmt.setBackground('#F2F2F2').setFontColor('#FFFFFF');
+    // page2Fmt.setBackground('#F2F2F2').setFontColor('#FFFFFF');
+    // const pdfBW = _exportSheetAsPDF(ss, sh.getSheetId(), `${fileBaseName}_BW`);
+    // shabbosFolder.createFile(pdfBW);
+    
+    // // 6) Restore original formatting & cleanup
+    // page1Fmt.setBackgrounds(bg1).setFontColors(fg1);
+    // page2Fmt.setBackgrounds(bg2).setFontColors(fg2);
+    // sh.removePageBreak(pb);
   }
   
   
-  function _exportVisibleAsPDF(ss, name) {
-    // scale=4 = fit-to-page; leaving out &gid prints all visible sheets in order
-    const url = `https://docs.google.com/spreadsheets/d/${ss.getId()}/export?` +
-      [
-        'exportFormat=pdf',
-        'format=pdf',
-        'size=letter',
-        'portrait=true',
-        'fitw=true',
-        'scale=4',
-        'top_margin=0.5',
-        'bottom_margin=0.5',
-        'left_margin=0.5',
-        'right_margin=0.5',
-        'sheetnames=false',
-        'printtitle=false',
-        'pagenumbers=true',
-        'gridlines=false',
-        'fzr=false'
-      ].join('&');
-  
-    const resp = UrlFetchApp.fetch(url, {
-      headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() }
-    });
+  function _exportSheetAsPDF(ss, sheetId, name) {
+    const baseUrl = ss.getUrl().replace(/\/edit.*$/, '');
+    const opts = [
+      `export?exportFormat=pdf&format=pdf`,
+      `&gid=${sheetId}`,
+      '&range=BKTA!A1:G35',
+      `&size=letter`,
+      `&portrait=true`,
+      `&fitw=true`,
+      `&top_margin=0.50`,
+      `&bottom_margin=0.50`,
+      `&left_margin=0.50`,
+      `&right_margin=0.50`,
+      `&sheetnames=false`,
+      `&printtitle=false`,
+      `&pagenumbers=true`,
+      `&gridlines=false`,
+      `&fzr=false`
+    ].join('');
+    
+    const url   = baseUrl + opts;
+    const token = ScriptApp.getOAuthToken();
+    const resp  = UrlFetchApp.fetch(url, { headers: { Authorization: `Bearer ${token}` } });
     return resp.getBlob().setName(`${name}.pdf`);
   }
   
   
   function getUpcomingFriday() {
-    const d = new Date(), dow = d.getDay();
-    let diff = (5 - dow + 7) % 7;
-    if (diff === 0) diff = 7;
-    d.setDate(d.getDate() + diff);
-    return d;
+    const today = new Date();
+    const dow   = today.getDay();            // Sunday=0 … Friday=5
+    let diff    = (5 - dow + 7) % 7;         // days till Friday
+    if (diff === 0) diff = 7;                // if today is Friday, go to next Friday
+    today.setDate(today.getDate() + diff);
+    return today;
   }
   
