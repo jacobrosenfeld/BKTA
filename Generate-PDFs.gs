@@ -23,34 +23,7 @@ function saveTwoPagePDFs() {
     } else {
       shabbosFolder = parentFolder.createFolder(folderName);
     }
-    
-    // // 4) Ranges for formatting swap
-    // const page1Fmt = sh.getRange('B1:G4');
-    // const page2Fmt = sh.getRange('B32:G35');
-    // const bg1 = page1Fmt.getBackgrounds(), fg1 = page1Fmt.getFontColors();
-    // const bg2 = page2Fmt.getBackgrounds(), fg2 = page2Fmt.getFontColors();
-    
-    // // 5) Force two pages
-    // const pb = sh.insertPageBreak(31);
-    
-    // // —–– Color PDF
-    // page1Fmt.setBackground('#030e4f').setFontColor('#d78e22');
-    // page2Fmt.setBackground('#030e4f').setFontColor('#d78e22');
-    // const pdfColor = _exportSheetAsPDF(ss, sh.getSheetId(), `${fileBaseName}_Color`);
-    // shabbosFolder.createFile(pdfColor);
-    
-    // // —–– B/W PDF
-    // page1Fmt.setBackground('#F2F2F2').setFontColor('#FFFFFF');
-    // page2Fmt.setBackground('#F2F2F2').setFontColor('#FFFFFF');
-    // const pdfBW = _exportSheetAsPDF(ss, sh.getSheetId(), `${fileBaseName}_BW`);
-    // shabbosFolder.createFile(pdfBW);
-    
-    // // 6) Restore original formatting & cleanup
-    // page1Fmt.setBackgrounds(bg1).setFontColors(fg1);
-    // page2Fmt.setBackgrounds(bg2).setFontColors(fg2);
-    // sh.removePageBreak(pb);
-  }
-  
+    Logger.log(`Shabbos folder: ${shabbosFolder.getName()} (${shabbosFolder.getId()})`);
   
   function _exportSheetAsPDF(ss, sheetId, name) {
     const baseUrl = 'https://docs.google.com/spreadsheets/d/' + ss.getId() + '/export?';
