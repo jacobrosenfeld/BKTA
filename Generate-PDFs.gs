@@ -81,7 +81,7 @@ function saveRangePDF() {
     const d   = new Date();
     const dow = d.getDay();            // Sunday=0 … Friday=5
     let diff  = (5 - dow + 7) % 7;
-    if (diff === 0) diff = 7;          // if today IS Friday, pick next
+    // if (diff === 0) diff = 7;          // if today IS Friday, pick next
     d.setDate(d.getDate() + diff);
     return d;
   }
