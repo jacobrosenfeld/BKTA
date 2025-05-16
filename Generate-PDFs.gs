@@ -2,41 +2,45 @@ function saveRangePDF() {
     // —–– CONFIGURE THESE —––
     const sheetName      = 'BKTA';
     const parentFolderId = '19chei_ERIjgjFqGfnteUquSGtuRLLZMB';
-    const ss             = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet          = ss.getSheetByName(sheetName);
+    const fileBaseName   = 'BKTA Newsletter';
+    
+    const ss    = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(sheetName);
     if (!sheet) throw new Error(`Sheet "${sheetName}" not found.`);
     
     // grab parsha from J2
     const parshaName = sheet.getRange('J2').getDisplayValue().trim();
     
-    // compute or create Shabbos subfolder (and file base name)
-    const parent = DriveApp.getFolderById(parentFolderId);
-    const friday = getUpcomingFriday();
-    const tz     = ss.getSpreadsheetTimeZone();
-    // this is now both folder name AND base file name
-    const subName = `Shabbos - ${Utilities.formatDate(friday, tz, 'yyyy-MM-dd')} - ${parshaName}`;
+    // compute upcoming Friday & date string
+    const friday  = getUpcomingFriday();
+    const tz      = ss.getSpreadsheetTimeZone();
+    const dateStr = Utilities.formatDate(friday, tz, 'yyyy-MM-dd');
     
-    let folder = parent.getFoldersByName(subName).hasNext()
-                   ? parent.getFoldersByName(subName).next()
-                   : parent.createFolder(subName);
+    // build subfolder (unchanged)
+    const parent  = DriveApp.getFolderById(parentFolderId);
+    const folderName = `Shabbos - ${dateStr} - ${parshaName}`;
+    const folder  = parent.getFoldersByName(folderName).hasNext()
+                      ? parent.getFoldersByName(folderName).next()
+                      : parent.createFolder(folderName);
     
-    // export the range B1:G62 as a fit-to-width PDF blob
+    // export the range B1:G62
     const blob = exportRangeAsPDF(
       ss.getId(),
       sheet.getSheetId(),
       `${sheetName}!B1:G62`
     );
     
-    // version control on subName.pdf → subName_v2.pdf → …
-    let version  = 1;
-    let fileName = `${subName}.pdf`;
+    // build the versioned filename
+    const baseFile = `${fileBaseName} - ${parshaName} - ${dateStr}`;
+    let version    = 1;
+    let fileName   = `${baseFile}.pdf`;
+    
     while ( folder.getFilesByName(fileName).hasNext() ) {
       version++;
-      fileName = `${subName}_v${version}.pdf`;
+      fileName = `${baseFile}_v${version}.pdf`;
     }
-    blob.setName(fileName);
     
-    // save into the Shabbos folder
+    blob.setName(fileName);
     folder.createFile(blob);
   }
   
