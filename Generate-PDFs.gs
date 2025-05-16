@@ -65,9 +65,9 @@ function saveTwoPagePDFs() {
   
   
   function exportVisibleSheetsAsPDF(ss, name) {
-    const baseUrl = ss.getUrl().replace(/\/edit.*$/, '');
+    const baseUrl = 'https://docs.google.com/spreadsheets/d/' + ss.getId() + '/export?';
     const params = [
-      'export?exportFormat=pdf&format=pdf',
+      'exportFormat=pdf&format=pdf',
       '&size=letter',
       '&portrait=true',
       '&fitw=true',
