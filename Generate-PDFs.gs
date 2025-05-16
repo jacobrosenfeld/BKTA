@@ -1,63 +1,79 @@
-function saveTwoPagePDFs() {
+function saveRangePDF() {
     // —–– CONFIGURE THESE —––
-    const sheetName    = 'BKTA';
-    const fileBaseName = 'BKTA Newsletter';
-    const ss           = SpreadsheetApp.getActiveSpreadsheet();
-    const sh           = ss.getSheetByName(sheetName);
-    if (!sh) throw new Error(`Sheet "${sheetName}" not found`);
-    
-    // 1) Use your specific “parent” folder ID
+    const sheetName      = 'BKTA';
+    const baseName       = 'BKTA Newsletter';
     const parentFolderId = '19chei_ERIjgjFqGfnteUquSGtuRLLZMB';
-    const parentFolder   = DriveApp.getFolderById(parentFolderId);
     
-    // 2) Compute upcoming Friday’s date
-    const fridayDate = getUpcomingFriday();
-    const tz         = ss.getSpreadsheetTimeZone();
-    const folderName = `Shabbos - ${Utilities.formatDate(fridayDate, tz, 'yyyy-MM-dd')}`;
+    // grab sheet & Drive folder
+    const ss     = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet  = ss.getSheetByName(sheetName);
+    if (!sheet) throw new Error(`Sheet "${sheetName}" not found.`);
+    const parent = DriveApp.getFolderById(parentFolderId);
     
-    // 3) Create or reuse the “Shabbos - YYYY-MM-DD” subfolder
-    let shabbosFolder;
-    const it = parentFolder.getFoldersByName(folderName);
-    if (it.hasNext()) {
-      shabbosFolder = it.next();
-    } else {
-      shabbosFolder = parentFolder.createFolder(folderName);
+    // compute or create Shabbos subfolder
+    const friday = getUpcomingFriday();
+    const tz     = ss.getSpreadsheetTimeZone();
+    const subName= `Shabbos - ${Utilities.formatDate(friday, tz, 'yyyy-MM-dd')}`;
+    let folder   = parent.getFoldersByName(subName).hasNext()
+                     ? parent.getFoldersByName(subName).next()
+                     : parent.createFolder(subName);
+    
+    // build & fetch the PDF blob for B1:G62
+    const rangeRef = `${sheetName}!B1:G61`;
+    const blob     = exportRangeAsPDF(ss.getId(), sheet.getSheetId(), rangeRef);
+    
+    // versioning: baseName.pdf → baseName_v2.pdf → …
+    let version = 1;
+    let fileName = `${baseName}.pdf`;
+    while ( folder.getFilesByName(fileName).hasNext() ) {
+      version++;
+      fileName = `${baseName}_v${version}.pdf`;
     }
-    Logger.log(`Shabbos folder: ${shabbosFolder.getName()} (${shabbosFolder.getId()})`);
-  
-  function _exportSheetAsPDF(ss, sheetId, name) {
-    const baseUrl = 'https://docs.google.com/spreadsheets/d/' + ss.getId() + '/export?';
-    const opts = [
-      `export?exportFormat=pdf&format=pdf`,
-      `&gid=${sheetId}`,
-      '&range=BKTA!B1:G61',
-      `&size=letter`,
-      `&portrait=true`,
-      `&fitw=true`,
-      `&top_margin=0.50`,
-      `&bottom_margin=0.50`,
-      `&left_margin=0.50`,
-      `&right_margin=0.50`,
-      `&sheetnames=false`,
-      `&printtitle=false`,
-      `&pagenumbers=true`,
-      `&gridlines=false`,
-      `&fzr=false`
-    ].join('');
+    blob.setName(fileName);
     
-    const url   = baseUrl + opts;
-    const token = ScriptApp.getOAuthToken();
-    const resp  = UrlFetchApp.fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-    return resp.getBlob().setName(`${name}.pdf`);
+    // save!
+    folder.createFile(blob);
   }
   
   
+  // helper: builds the export URL & returns a PDF blob
+  function exportRangeAsPDF(ssId, gid, range) {
+    const url =  
+      `https://docs.google.com/spreadsheets/d/${ssId}/export?` +
+      [
+        'exportFormat=pdf',
+        'format=pdf',
+        'size=letter',
+        'portrait=true',
+        'fitw=true',                      // fit-to-width
+        `range=${encodeURIComponent(range)}`,
+        `gid=${gid}`,
+        'top_margin=0.50',
+        'bottom_margin=0.50',
+        'left_margin=0.50',
+        'right_margin=0.50',
+        'sheetnames=false',
+        'printtitle=false',
+        'pagenumbers=true',
+        'gridlines=false',
+        'fzr=false'
+      ].join('&');
+  
+    const token = ScriptApp.getOAuthToken();
+    const resp  = UrlFetchApp.fetch(url, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return resp.getBlob();
+  }
+  
+  
+  // helper: next Friday’s date
   function getUpcomingFriday() {
-    const today = new Date();
-    const dow   = today.getDay();            // Sunday=0 … Friday=5
-    let diff    = (5 - dow + 7) % 7;         // days till Friday
-    if (diff === 0) diff = 7;                // if today is Friday, go to next Friday
-    today.setDate(today.getDate() + diff);
-    return today;
+    const d   = new Date();
+    const dow = d.getDay();            // Sunday=0 … Friday=5
+    let diff  = (5 - dow + 7) % 7;     
+    if (diff === 0) diff = 7;          // if today IS Friday, pick next
+    d.setDate(d.getDate() + diff);
+    return d;
   }
   
