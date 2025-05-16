@@ -1,43 +1,45 @@
 function saveRangePDF() {
     // —–– CONFIGURE THESE —––
     const sheetName      = 'BKTA';
-    const baseName       = 'BKTA Newsletter';
     const parentFolderId = '19chei_ERIjgjFqGfnteUquSGtuRLLZMB';
-    
-    // grab sheet & Drive folder
-    const ss     = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet  = ss.getSheetByName(sheetName);
+    const ss             = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet          = ss.getSheetByName(sheetName);
     if (!sheet) throw new Error(`Sheet "${sheetName}" not found.`);
-    const parent = DriveApp.getFolderById(parentFolderId);
     
-    // grab the parsha name from J2
+    // grab parsha from J2
     const parshaName = sheet.getRange('J2').getDisplayValue().trim();
     
-    // compute or create Shabbos subfolder
+    // compute or create Shabbos subfolder (and file base name)
+    const parent = DriveApp.getFolderById(parentFolderId);
     const friday = getUpcomingFriday();
     const tz     = ss.getSpreadsheetTimeZone();
-    const subName   = `Shabbos - ${Utilities.formatDate(friday, tz,'yyyy-MM-dd')} - ${parshaName}`;
-    let folder   = parent.getFoldersByName(subName).hasNext()
-                     ? parent.getFoldersByName(subName).next()
-                     : parent.createFolder(subName);
+    // this is now both folder name AND base file name
+    const subName = `Shabbos - ${Utilities.formatDate(friday, tz, 'yyyy-MM-dd')} - ${parshaName}`;
     
-    // build & fetch the PDF blob for B1:G62
-    const rangeRef = `${sheetName}!B1:G61`;
-    const blob     = exportRangeAsPDF(ss.getId(), sheet.getSheetId(), rangeRef);
+    let folder = parent.getFoldersByName(subName).hasNext()
+                   ? parent.getFoldersByName(subName).next()
+                   : parent.createFolder(subName);
     
-    // versioning: baseName.pdf → baseName_v2.pdf → …
-    let version = 1;
-    let fileName = `${baseName}.pdf`;
+    // export the range B1:G62 as a fit-to-width PDF blob
+    const blob = exportRangeAsPDF(
+      ss.getId(),
+      sheet.getSheetId(),
+      `${sheetName}!B1:G62`
+    );
+    
+    // version control on subName.pdf → subName_v2.pdf → …
+    let version  = 1;
+    let fileName = `${subName}.pdf`;
     while ( folder.getFilesByName(fileName).hasNext() ) {
       version++;
-      fileName = `${baseName}_v${version}.pdf`;
+      fileName = `${subName}_v${version}.pdf`;
     }
     blob.setName(fileName);
     
-    // save!
+    // save into the Shabbos folder
     folder.createFile(blob);
   }
-
+  
   
   // helper: builds the export URL & returns a PDF blob
   function exportRangeAsPDF(ssId, gid, range) {
@@ -48,8 +50,8 @@ function saveRangePDF() {
         'format=pdf',
         'size=letter',
         'portrait=true',
-        'fitw=true',                      // fit-to-width
-        `range=${encodeURIComponent(range)}`,
+        'fitw=true',                                 // fit-to-width
+        `range=${encodeURIComponent(range)}`,        // e.g. BKTA!B1:G62
         `gid=${gid}`,
         'top_margin=0.50',
         'bottom_margin=0.50',
@@ -74,10 +76,9 @@ function saveRangePDF() {
   function getUpcomingFriday() {
     const d   = new Date();
     const dow = d.getDay();            // Sunday=0 … Friday=5
-    let diff  = (5 - dow + 7) % 7;     
-    // if (diff === 0) diff = 7;          // if today IS Friday, pick next
+    let diff  = (5 - dow + 7) % 7;
+    if (diff === 0) diff = 7;          // if today IS Friday, pick next
     d.setDate(d.getDate() + diff);
     return d;
-    
   }
   
