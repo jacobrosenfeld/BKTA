@@ -10,10 +10,13 @@ function saveRangePDF() {
     if (!sheet) throw new Error(`Sheet "${sheetName}" not found.`);
     const parent = DriveApp.getFolderById(parentFolderId);
     
+    // grab the parsha name from J2
+    const parshaName = sheet.getRange('J2').getDisplayValue().trim();
+    
     // compute or create Shabbos subfolder
     const friday = getUpcomingFriday();
     const tz     = ss.getSpreadsheetTimeZone();
-    const subName= `Shabbos - ${Utilities.formatDate(friday, tz, 'yyyy-MM-dd')}`;
+    const subName   = `Shabbos - ${Utilities.formatDate(friday, tz,'yyyy-MM-dd')} - ${parshaName}`;
     let folder   = parent.getFoldersByName(subName).hasNext()
                      ? parent.getFoldersByName(subName).next()
                      : parent.createFolder(subName);
