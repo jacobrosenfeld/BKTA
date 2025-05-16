@@ -29,7 +29,7 @@ function saveRangePDF() {
     );
     
     // Detect B/W mode by B1 background
-    const isBW   = sheet.getRange('B1').getBackground().toLowerCase() === '#c0c0c0';
+    const isBW   = sheet.getRange('B1').getBackground().toLowerCase() === '#F2F2F2';
     const base   = `${fileBaseName} - ${parshaName} - ${dateStr}`;
     
     // Determine version from existing color files
